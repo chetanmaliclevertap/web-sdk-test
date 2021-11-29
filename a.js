@@ -190,18 +190,33 @@ function __wizrocket() {
    */
   wiz.setUpChromeFirefoxNotifications = function (subscriptionCallback, serviceWorkerPath) {
 
-
+    let _registrationScope = ''
     if ('serviceWorker' in navigator) {
       navigator["serviceWorker"]['register'](serviceWorkerPath)['then'](function (registration) {
+        _registrationScope = registration.scope;
         if (typeof __wzrk_account_id !== "undefined") {
 
           //shopify accounts , since the service worker is not at root, serviceWorker.ready is never resolved.
           // hence add a timeout and hope serviceWroker is ready within that time.
           return new Promise(resolve => setTimeout(() => resolve(registration), 5000));
         }
-        return navigator['serviceWorker']['ready'];
-      })['then'](function (serviceWorkerRegistration) {
 
+        const rootDirRegex = /^(\.?)(\/?)([^/]*).js$/
+        let isServiceWorkerAtRoot = rootDirRegex.test(serviceWorkerPath)
+        if (isServiceWorkerAtRoot) {
+          return navigator['serviceWorker']['ready'];
+        } else {
+          if (navigator.userAgent.indexOf('Chrome') !== -1) {
+            return new Promise(resolve => setTimeout(() => resolve(registration), 5000));
+          } else {
+            return navigator.serviceWorker.getRegistrations()
+          }
+        }
+
+      })['then'](function (serviceWorkerRegistration) {
+        if(navigator.userAgent.indexOf('Firefox') !== -1 && Array.isArray(serviceWorkerRegistration)) {
+          serviceWorkerRegistration = serviceWorkerRegistration.filter((i) => i.scope === _registrationScope)[0]
+        }
         var subscribeObj = { "userVisibleOnly": true }
 
         if(fcmPublicKey != null) {
